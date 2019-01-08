@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # vueapp
 
 > A Vue.js project
@@ -28,3 +29,6 @@ npm test
 ```
 
 For a detailed explanation on how things work, check out the [guide](http://vuejs-templates.github.io/webpack/) and [docs for vue-loader](http://vuejs.github.io/vue-loader).
+=======
+# Teneocto
+>>>>>>> d13d7d99cf163a9f694c0fc422c31f6635fed62b
