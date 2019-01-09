@@ -5,38 +5,32 @@
     </div>
     <div class="panel panel-primary">
       <div class="panel-heading">
-        <h4>Add product</h4>
+        <h3>Add product</h3>
       </div>
       <div class="panel-body">
-        <form id="form" class="form-horizontal" v-on:submit="addProduct()">
-          <div class="form-group">
-            <label class="control-label col-sm-2">Id</label>
-            <div class="col-sm-8">
-              <input type="text" v-model="_id" class="form-control">
-            </div>
-          </div>
+        <form id="form" class="form-horizontal">
           <div class="form-group">
             <label class="control-label col-sm-2">Name</label>
             <div class="col-sm-8">
-              <input type="text" v-model="_name" class="form-control">
+              <input type="text" v-model="Productname" class="form-control">
             </div>
           </div>
           <div class="form-group">
             <label class="control-label col-sm-2">Description</label>
             <div class="col-sm-8">
-              <input type="text" v-model="_description" class="form-control">
+              <input type="text" v-model="Productdescription" class="form-control">
             </div>
           </div>
           <div class="form-group">
             <label class="control-label col-sm-2">Price</label>
             <div class="col-sm-8">
-              <input type="number" v-model="_price" class="form-control">
+              <input type="number" v-model="Productprice" class="form-control">
             </div>
           </div>
           <div class="form-group">
             <label class="control-label col-sm-2">Category</label>
             <div class="col-sm-8">
-              <select class="form-control" v-model="_category">
+              <select class="form-control" v-model="Productcategory">
                 <option>clothes</option>
                 <option>food</option>
                 <option>household good</option>
@@ -45,9 +39,10 @@
           </div>
           <div class="form-group">
             <label class="control-label col-sm-2">Image</label>
+            <input type="file" @change="selectedFile">
           </div>
           <div class="form-group">
-            <input type="submit" class="btn btn-primary" value="Add product">
+            <button class="btn btn-primary" @click="addProduct()">Add Product</button>
           </div>
         </form>
       </div>
@@ -70,11 +65,54 @@
           </thead>
           <tbody>
             <tr v-for="book in books" v-bind:key="book.id">
-              <td>{{book.image}}</td>
-              <td>{{book.name}}</td>
-              <td>{{book.description}}</td>
-              <td>{{book.price}}</td>
-              <td>{{book.category}}</td>
+              <td>
+                <img v-bind:src="book.image">
+                <input type="file" v-if="edit == book.id" @change="selectedFile">
+              </td>
+              <td>
+                <input
+                  id="tableInput"
+                  type="text"
+                  class="form-control"
+                  :readonly="(edit==book.id)?false:true"
+                  v-model="book.name"
+                >
+              </td>
+              <td>
+                <input
+                  id="tableInput"
+                  type="text"
+                  class="form-control"
+                  :readonly="(edit == book.id)?false:true"
+                  v-model="book.description"
+                >
+              </td>
+              <td>
+                <input
+                  id="tableInput"
+                  type="text"
+                  class="form-control"
+                  :readonly="(edit == book.id)?false:true"
+                  v-model="book.price"
+                >
+              </td>
+              <td>
+                <select
+                  id="tableInput"
+                  class="form-control"
+                  :disabled="(edit == book.id)?false:true"
+                  v-model="book.category"
+                >
+                  <option>clothes</option>
+                  <option>food</option>
+                  <option>household good</option>
+                </select>
+              </td>
+              <td>
+                <button class="btn btn-primary" @click="editProduct(book.id)">Edit</button>
+                <button class="btn btn-primary" @click="saveChange(book)">Save</button>
+                <button class="btn btn-danger" @click="deleteProduct(book.id)">Delete</button>
+              </td>
             </tr>
           </tbody>
         </table>
@@ -86,6 +124,7 @@
 import Vuefire from "vuefire";
 import firebase from "firebase";
 import "firebase/firestore";
+import { create } from "domain";
 var config = {
   apiKey: "AIzaSyDGu5dDzNB1RbUS-lU6WvL51s8jc1BYjpc",
   authDomain: "vuejs-firebase-425c6.firebaseapp.com",
@@ -99,53 +138,144 @@ const database = firebase.firestore();
 database.settings({
   timestampsInSnapshots: true
 });
+const storage = firebase.storage();
 
 database.enablePersistence();
 export default {
   name: "HelloWorld",
 
-
   data() {
     return {
       books: [],
-      _id:null,
-      _name:null,
-      _description:null,
-      _price:null,
-      _category:null,
-      _image:null,
- 
+      Productid: null,
+      Productname: null,
+      Productdescription: null,
+      Productprice: null,
+      Productcategory: null,
+      Productimage: null,
+      file: null,
+      url: null,
+      edit: null,
+      temp: null
     };
   },
   created() {
-    database.collection("products").get().then(querySnapshot =>{
-      querySnapshot.forEach(doc =>{
-        console.log(doc.data());
-        const data = {
-          'id': doc.id,
-          'name':doc.data().name,
-          'description':doc.data().description,
-          'price':doc.data().price,
-          'category':doc.data().category,
-          'image':doc.data().image
-        }
-        this.books.push(data);
-      })
-    })
+    this.getData();
   },
-  methods:{
-    addProduct(_id,_name,_description,_price,_category,_image){
-    database.collection("products").add({
-          'id': this._id,
-          'name':this._name,
-          'description':this._description,
-          'price':this._price,
-          'category':this._category,
-          // 'image':this._image
-    })
-  }
-  }
 
+  methods: {
+    getData() {
+      database
+        .collection("products")
+        .orderBy("name")
+        .get()
+        .then(querySnapshot => {
+          querySnapshot.forEach(doc => {
+            const data = {
+              id: doc.id,
+              name: doc.data().name,
+              description: doc.data().description,
+              price: doc.data().price,
+              category: doc.data().category,
+              image: doc.data().image
+            };
+            this.books.push(data);
+          });
+        });
+    },
+    selectedFile(event) {
+      this.file = event.target.files[0];
+    },
+    addProduct(
+      Productid,
+      Productname,
+      Productdescription,
+      Productprice,
+      Productcategory
+    ) {
+      var that = this;
+      var uploadTask = storage.ref("image/" + this.file.name).put(this.file);
+      uploadTask.on("state_changed", function(snapshot) {
+        var progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+        console.log("Upload is " + progress + "% done");
+        switch (snapshot.state) {
+          case firebase.storage.TaskState.PAUSED: // or 'paused'
+            console.log("Upload is paused");
+            break;
+          case firebase.storage.TaskState.RUNNING: // or 'running'
+            console.log("Upload is running");
+            break;
+        }
+        // Handle successful uploads on complete
+        // For instance, get the download URL: https://firebasestorage.googleapis.com/...
+        uploadTask.snapshot.ref.getDownloadURL().then(function(downloadURL) {
+          console.log("File available at", downloadURL);
+          database.collection("products").add({
+            name: that.Productname,
+            description: that.Productdescription,
+            price: that.Productprice,
+            category: that.Productcategory,
+            image: downloadURL
+          });
+        });
+      });
+    },
+    editProduct(id) {
+      this.edit = id;
+    },
+    saveChange(book) {
+      this.edit = 0;
+      this.temp = book;
+      var that = this.temp;
+      console.log(that.name);
+      if (this.file != null) {
+        var uploadTask = storage.ref("image/" + this.file.name).put(this.file);
+        uploadTask.on("state_changed", function(snapshot) {
+          var progress =
+            (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+          console.log("Upload is " + progress + "% done");
+          switch (snapshot.state) {
+            case firebase.storage.TaskState.PAUSED: // or 'paused'
+              console.log("Upload is paused");
+              break;
+            case firebase.storage.TaskState.RUNNING: // or 'running'
+              console.log("Upload is running");
+              break;
+          }
+          // Handle successful uploads on complete
+          // For instance, get the download URL: https://firebasestorage.googleapis.com/...
+          uploadTask.snapshot.ref.getDownloadURL().then(function(downloadURL) {
+            console.log("File available at", downloadURL);
+            database
+              .collection("products")
+              .doc(that.id)
+              .update({
+                image: downloadURL
+              });
+          });
+        });
+      }
+
+      database
+        .collection("products")
+        .doc(book.id)
+        .update({
+          name: book.name,
+          description: book.description,
+          price: book.price,
+          category: book.category,
+          image: book.image
+        });
+    },
+
+    deleteProduct(id) {
+      database
+        .collection("products")
+        .doc(id)
+        .delete();
+        location.reload();
+    }
+  }
 };
 </script>
 <style>
@@ -157,7 +287,17 @@ export default {
   color: #2c3e50;
   margin-top: 60px;
 }
-th {
+th,
+#tableInput,
+option {
   text-align: center;
+}
+img {
+  width: 100px;
+  height: 100px;
+}
+button {
+  width: 100px;
+  height: 50px;
 }
 </style>
