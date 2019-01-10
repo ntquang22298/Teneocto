@@ -39,10 +39,11 @@
           </div>
           <div class="form-group">
             <label class="control-label col-sm-2">Image</label>
-            <input type="file" @change="selectedFile">
+            <input id="fileInput" type="file" @change="selectedFile">
           </div>
           <div class="form-group">
-            <button class="btn btn-primary" @click="addProduct()">Add Product</button>
+            <button class="btn btn-primary" @click="addProduct()">Add product</button>
+            <button class="btn btn-primary" @click="refreshFrom()">Refresh</button>
           </div>
         </form>
       </div>
@@ -109,8 +110,16 @@
                 </select>
               </td>
               <td>
-                <button class="btn btn-primary" @click="editProduct(book.id)">Edit</button>
-                <button class="btn btn-primary" @click="saveChange(book)">Save</button>
+                <button
+                  class="btn btn-primary"
+                  v-if="edit != book.id"
+                  @click="editProduct(book.id)"
+                >Edit</button>
+                <button
+                  v-if="edit == book.id"
+                  class="btn btn-primary"
+                  @click="saveChange(book)"
+                >Save</button>
                 <button class="btn btn-danger" @click="deleteProduct(book.id)">Delete</button>
               </td>
             </tr>
@@ -121,9 +130,9 @@
   </div>
 </template>
 <script>
-import Vuefire from "vuefire";
-import firebase from "firebase";
+import firebase from "firebase/app";
 import "firebase/firestore";
+import "firebase/storage";
 import { create } from "domain";
 var config = {
   apiKey: "AIzaSyDGu5dDzNB1RbUS-lU6WvL51s8jc1BYjpc",
@@ -156,15 +165,41 @@ export default {
       file: null,
       url: null,
       edit: null,
-      temp: null
+      temp: null,
+      isLoaded: false
     };
   },
   created() {
-    this.getData();
+    database
+      .collection("products")
+      .orderBy("name")
+      .get()
+      .then(querySnapshot => {
+        querySnapshot.forEach(doc => {
+          const data = {
+            id: doc.id,
+            name: doc.data().name,
+            description: doc.data().description,
+            price: doc.data().price,
+            category: doc.data().category,
+            image: doc.data().image
+          };
+          this.books.push(data);
+        });
+      });
   },
 
   methods: {
+    refreshFrom() {
+      (this.Productid = null),
+        (this.Productname = null),
+        (this.Productdescription = null),
+        (this.Productprice = null),
+        (this.Productcategory = null),
+        (document.getElementById("fileInput").value = "");
+    },
     getData() {
+      let array = [];
       database
         .collection("products")
         .orderBy("name")
@@ -179,9 +214,11 @@ export default {
               category: doc.data().category,
               image: doc.data().image
             };
-            this.books.push(data);
+            array.push(data);
           });
         });
+      this.books = array;
+      this.refreshFrom();
     },
     selectedFile(event) {
       this.file = event.target.files[0];
@@ -195,42 +232,11 @@ export default {
     ) {
       var that = this;
       var uploadTask = storage.ref("image/" + this.file.name).put(this.file);
-      uploadTask.on("state_changed", function(snapshot) {
-        var progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-        console.log("Upload is " + progress + "% done");
-        switch (snapshot.state) {
-          case firebase.storage.TaskState.PAUSED: // or 'paused'
-            console.log("Upload is paused");
-            break;
-          case firebase.storage.TaskState.RUNNING: // or 'running'
-            console.log("Upload is running");
-            break;
-        }
-        // Handle successful uploads on complete
-        // For instance, get the download URL: https://firebasestorage.googleapis.com/...
-        uploadTask.snapshot.ref.getDownloadURL().then(function(downloadURL) {
-          console.log("File available at", downloadURL);
-          database.collection("products").add({
-            name: that.Productname,
-            description: that.Productdescription,
-            price: that.Productprice,
-            category: that.Productcategory,
-            image: downloadURL
-          });
-        });
-      });
-    },
-    editProduct(id) {
-      this.edit = id;
-    },
-    saveChange(book) {
-      this.edit = 0;
-      this.temp = book;
-      var that = this.temp;
-      console.log(that.name);
-      if (this.file != null) {
-        var uploadTask = storage.ref("image/" + this.file.name).put(this.file);
-        uploadTask.on("state_changed", function(snapshot) {
+      uploadTask.on(
+        "state_changed",
+        function(snapshot) {
+          // Observe state change events such as progress, pause, and resume
+          // Get task progress, including the number of bytes uploaded and the total number of bytes to be uploaded
           var progress =
             (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
           console.log("Upload is " + progress + "% done");
@@ -242,20 +248,33 @@ export default {
               console.log("Upload is running");
               break;
           }
-          // Handle successful uploads on complete
-          // For instance, get the download URL: https://firebasestorage.googleapis.com/...
+        },
+        function(error) {
+          // Handle unsuccessful uploads
+        },
+        function() {
           uploadTask.snapshot.ref.getDownloadURL().then(function(downloadURL) {
             console.log("File available at", downloadURL);
-            database
-              .collection("products")
-              .doc(that.id)
-              .update({
-                image: downloadURL
-              });
+            database.collection("products").add({
+              name: that.Productname,
+              description: that.Productdescription,
+              price: that.Productprice,
+              category: that.Productcategory,
+              image: downloadURL
+            });
+            that.getData();
           });
-        });
-      }
-
+        }
+      );
+    },
+    editProduct(id) {
+      this.edit = id;
+    },
+    saveChange(book) {
+      this.edit = 0;
+      var temp = book;
+      var that = this;
+      console.log(that.name);
       database
         .collection("products")
         .doc(book.id)
@@ -266,6 +285,47 @@ export default {
           category: book.category,
           image: book.image
         });
+      if (this.file != null) {
+        var uploadTask = storage.ref("image/" + this.file.name).put(this.file);
+        uploadTask.on(
+          "state_changed",
+          function(snapshot) {
+            // Observe state change events such as progress, pause, and resume
+            // Get task progress, including the number of bytes uploaded and the total number of bytes to be uploaded
+            var progress =
+              (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+            console.log("Upload is " + progress + "% done");
+            switch (snapshot.state) {
+              case firebase.storage.TaskState.PAUSED: // or 'paused'
+                console.log("Upload is paused");
+                break;
+              case firebase.storage.TaskState.RUNNING: // or 'running'
+                console.log("Upload is running");
+                break;
+            }
+          },
+          function(error) {
+            // Handle unsuccessful uploads
+          },
+          function() {
+            uploadTask.snapshot.ref
+              .getDownloadURL()
+              .then(function(downloadURL) {
+                console.log("File available at", downloadURL);
+
+                database
+                  .collection("products")
+                  .doc(temp.id)
+                  .update({
+                    image: downloadURL
+                  });
+                that.getData();
+              });
+          }
+        );
+      } else {
+        this.getData();
+      }
     },
 
     deleteProduct(id) {
@@ -273,7 +333,7 @@ export default {
         .collection("products")
         .doc(id)
         .delete();
-        location.reload();
+      this.getData();
     }
   }
 };
