@@ -65,18 +65,18 @@
             </tr>
           </thead>
           <tbody>
-            <tr v-for="book in books" v-bind:key="book.id">
+            <tr v-for="product in products" v-bind:key="product.id">
               <td>
-                <img v-bind:src="book.image">
-                <input type="file" v-if="edit == book.id" @change="selectedFile">
+                <img v-bind:src="product.image">
+                <input type="file" v-if="edit == product.id" @change="selectedFile">
               </td>
               <td>
                 <input
                   id="tableInput"
                   type="text"
                   class="form-control"
-                  :readonly="(edit==book.id)?false:true"
-                  v-model="book.name"
+                  :readonly="(edit==product.id)?false:true"
+                  v-model="product.name"
                 >
               </td>
               <td>
@@ -84,8 +84,8 @@
                   id="tableInput"
                   type="text"
                   class="form-control"
-                  :readonly="(edit == book.id)?false:true"
-                  v-model="book.description"
+                  :readonly="(edit == product.id)?false:true"
+                  v-model="product.description"
                 >
               </td>
               <td>
@@ -93,16 +93,16 @@
                   id="tableInput"
                   type="text"
                   class="form-control"
-                  :readonly="(edit == book.id)?false:true"
-                  v-model="book.price"
+                  :readonly="(edit == product.id)?false:true"
+                  v-model="product.price"
                 >
               </td>
               <td>
                 <select
                   id="tableInput"
                   class="form-control"
-                  :disabled="(edit == book.id)?false:true"
-                  v-model="book.category"
+                  :disabled="(edit == product.id)?false:true"
+                  v-model="product.category"
                 >
                   <option>clothes</option>
                   <option>food</option>
@@ -112,15 +112,15 @@
               <td>
                 <button
                   class="btn btn-primary"
-                  v-if="edit != book.id"
-                  @click="editProduct(book.id)"
+                  v-if="edit != product.id"
+                  @click="editProduct(product.id)"
                 >Edit</button>
                 <button
-                  v-if="edit == book.id"
+                  v-if="edit == product.id"
                   class="btn btn-primary"
-                  @click="saveChange(book)"
+                  @click="saveChange(product)"
                 >Save</button>
-                <button class="btn btn-danger" @click="deleteProduct(book.id)">Delete</button>
+                <button class="btn btn-danger" @click="deleteProduct(product.id)">Delete</button>
               </td>
             </tr>
           </tbody>
@@ -151,11 +151,11 @@ const storage = firebase.storage();
 
 database.enablePersistence();
 export default {
-  name: "HelloWorld",
+  name: "Product upload",
 
   data() {
     return {
-      books: [],
+      products: [],
       Productid: null,
       Productname: null,
       Productdescription: null,
@@ -184,7 +184,7 @@ export default {
             category: doc.data().category,
             image: doc.data().image
           };
-          this.books.push(data);
+          this.products.push(data);
         });
       });
   },
@@ -217,7 +217,7 @@ export default {
             array.push(data);
           });
         });
-      this.books = array;
+      this.products = array;
       this.refreshFrom();
     },
     selectedFile(event) {
@@ -270,20 +270,20 @@ export default {
     editProduct(id) {
       this.edit = id;
     },
-    saveChange(book) {
+    saveChange(product) {
       this.edit = 0;
-      var temp = book;
+      var temp = product;
       var that = this;
       console.log(that.name);
       database
         .collection("products")
-        .doc(book.id)
+        .doc(product.id)
         .update({
-          name: book.name,
-          description: book.description,
-          price: book.price,
-          category: book.category,
-          image: book.image
+          name: product.name,
+          description: product.description,
+          price: product.price,
+          category: product.category,
+          image: product.image
         });
       if (this.file != null) {
         var uploadTask = storage.ref("image/" + this.file.name).put(this.file);
